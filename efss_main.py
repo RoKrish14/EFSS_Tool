@@ -20,6 +20,9 @@ headers = {
     "Accept": "application/vnd.github+json",
 }
 
+# Timeout duration (in seconds)
+TIMEOUT = 30
+
 # Retreive all the repos from the org
 def get_repositories(org_name):
   # url = https://api.github.com/orgs/eclipse-tractusx/repos
@@ -28,7 +31,7 @@ def get_repositories(org_name):
     page = 1
     
     while True:
-        response = requests.get(url, headers=headers, params={"per_page": 100, "page": page})
+        response = requests.get(url, headers=headers, params={"per_page": 100, "page": page}, timeout=TIMEOUT)
         if handle_rate_limit(response):
             continue  # Retry after handling rate limit
         if response.status_code != 200:
@@ -46,7 +49,7 @@ def get_repositories(org_name):
 # Check if secret scanning is enabled
 def check_secret_scanning(repo_full_name):
     url = f"{BASE_URL}/repos/{repo_full_name}/secret-scanning/alerts"
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, timeout=TIMEOUT)
     
     if handle_rate_limit(response):
         return check_secret_scanning(repo_full_name)  # Retry after handling rate limit
@@ -79,7 +82,7 @@ def handle_rate_limit(response, max_retries=5):
                 backoff_time = min(sleep_time + 2 ** retries, 3600)  # cap backoff time at 1 hour
                 print(f"Rate limit reached. Sleeping for {backoff_time} seconds... (Retry {retries + 1}/{max_retries})")
                 time.sleep(backoff_time)
-                response = requests.get(response.url, headers=headers)
+                response = requests.get(response.url, headers=headers, timeout=TIMEOUT)
                 if response.status_code != 403:  # Exit if rate limit is not exceeded
                     return False
                 retries += 1
