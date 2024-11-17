@@ -40,16 +40,40 @@ def get_repositories(org_name):
     
     return repos
 
+# Check if secret scanning is enabled
+def check_secret_scanning(repo_full_name):
+    url = f"{BASE_URL}/repos/{repo_full_name}/secret-scanning/alerts"
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code == 200:
+        return True
+    elif response.status_code == 403:
+        return False  # Secret scanning not enabled or permissions issue
+    else:
+        raise Exception(f"Error checking secret scanning for {repo_full_name}: {response.json()}")
+
 def main():
     try:
-        # Retrieve all repositories
+        # Fetch all repositories in the organization
         repos = get_repositories(ORGANIZATION_NAME)
+        results = {}
+
+        for repo in repos:
+            repo_name = repo["full_name"]
+            try:
+                # Check secret scanning for the repository
+                secret_scanning_enabled = check_secret_scanning(repo_name)
+                results[repo_name] = secret_scanning_enabled
+                status = "enabled" if secret_scanning_enabled else "not enabled"
+                print(f"Secret scanning is {status} for repository {repo_name}.")
+            except Exception as e:
+                print(f"Failed to check secret scanning for {repo_name}: {e}")
         
-        # Save repository information to a JSON file
+        # Save results to a JSON file
         with open("all_repositories.json", "w") as f:
-            json.dump(repos, f, indent=4)
+            json.dump(results, f, indent=4)
         
-        print(f"Retrieved {len(repos)} repositories and saved to 'repositories.json'.")
+        print("Results saved to 'all_repositories.json'.")
     except Exception as e:
         print(f"An error occurred: {e}")
 
