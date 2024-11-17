@@ -11,7 +11,7 @@ response = requests.get(url, headers={"Authorization": f"Bearer {GITHUB_TOKEN}"}
 print(response.status_code, response.json())
 
 # Base URL for GitHub API
-BASE_URL = https://api.github.com
+BASE_URL = "https://api.github.com"
 
 # Headers with authorization
 headers = {
