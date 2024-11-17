@@ -55,6 +55,8 @@ def check_secret_scanning(repo_full_name):
         return True  # Secret scanning is enabled
     elif response.status_code == 404:
         return False  # Secret scanning not available for this repo
+    elif response.status_code == 304:
+        return "Unchanged" # no changed data from before
     elif response.status_code == 403:
         print(f"Access denied for {repo_full_name}. Check permissions.")
         return False  # Permissions issue
