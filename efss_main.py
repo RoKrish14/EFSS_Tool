@@ -20,6 +20,21 @@ headers = {
     "Accept": "application/vnd.github+json",
 }
 
+# Function to create an issue if secret scanning is not enabled
+def create_issue(owner, repo, title, body):
+    url = f"{BASE_URL}/repos/{owner}/{repo}/issues"
+    issue_data = {
+        "title": title,
+        "body": body
+    }
+    
+    response = requests.post(url, headers=headers, json=issue_data)
+    
+    if response.status_code == 201:
+        print(f"Issue successfully created in {repo}.")
+    else:
+        print(f"Failed to create issue in {repo}. Status Code: {response.status_code}, Error: {response.text}")
+
 # Timeout duration (in seconds)
 TIMEOUT = 30
 
@@ -108,6 +123,13 @@ def main():
                 org_results[repo_name] = secret_scanning_enabled
                 status = "enabled" if secret_scanning_enabled else "not enabled"
                 print(f"Secret scanning is {status} for repository {repo_name}.")
+                # If secret scanning is not enabled, create an issue
+                if not secret_scanning_enabled:
+                    title = "Enable Secret Scanning"
+                    body = f"Secret scanning is not enabled for this repository. Please enable it to improve security."
+                    create_issue(org_name, repo_name, title, body)
+                    print(f"Issue created for repository {repo_name}.")
+                    
             except Exception as e:
                 print(f"Failed to check secret scanning for {repo_name}: {e}")
         
