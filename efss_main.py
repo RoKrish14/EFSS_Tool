@@ -6,7 +6,7 @@ import os
 GITHUB_TOKEN = os.getenv('NEW_TOKEN')
 ORGANIZATION_NAME = 'eclipse-tractusx'
 
-url = fhttps://api.github.com/orgs/{ORGANIZATION_NAME}/repos
+url = f"https://api.github.com/orgs/{ORGANIZATION_NAME}/repos"
 response = requests.get(url, headers={"Authorization": f"Bearer {GITHUB_TOKEN}"})
 print(response.status_code, response.json())
 
