@@ -5,7 +5,7 @@ import time
 
 # set up authentication and configuration for interacting with the GitHub API
 GITHUB_TOKEN = os.getenv('NEW_TOKEN')
-ORGANIZATION_NAME = 'eclipse-cbi'
+ORGANIZATION_NAME = 'eclipse-tractusx'
 
 url = f"https://api.github.com/orgs/{ORGANIZATION_NAME}/repos"
 response = requests.get(url, headers={"Authorization": f"Bearer {GITHUB_TOKEN}"})
