@@ -1,14 +1,15 @@
 import requests
 import json
 import os
+import time
 
 # set up authentication and configuration for interacting with the GitHub API
 GITHUB_TOKEN = os.getenv('NEW_TOKEN')
-ORGANIZATION_NAME = 'eclipse-tractusx'
+ORGANIZATION_NAME = 'eclipse-cbi'
 
 url = f"https://api.github.com/orgs/{ORGANIZATION_NAME}/repos"
 response = requests.get(url, headers={"Authorization": f"Bearer {GITHUB_TOKEN}"})
-print(response.status_code, response.json())
+# print(response.status_code, response.json())
 
 # Base URL for GitHub API
 BASE_URL = "https://api.github.com"
@@ -42,15 +43,32 @@ def get_repositories(org_name):
 
 # Check if secret scanning is enabled
 def check_secret_scanning(repo_full_name):
+    """Checks if secret scanning is enabled for a specific repository."""
     url = f"{BASE_URL}/repos/{repo_full_name}/secret-scanning/alerts"
     response = requests.get(url, headers=headers)
     
+    if handle_rate_limit(response):
+        return check_secret_scanning(repo_full_name)  # Retry after handling rate limit
+
     if response.status_code == 200:
-        return True
+        return True  # Secret scanning is enabled
     elif response.status_code == 403:
-        return False  # Secret scanning not enabled or permissions issue
+        print(f"Access denied for {repo_full_name}. Check permissions.")
+        return False  # Permissions issue
     else:
-        raise Exception(f"Error checking secret scanning for {repo_full_name}: {response.json()}")
+        raise Exception(f"Error checking secret scanning for {repo_full_name}: {response.text}")
+
+def handle_rate_limit(response):
+    """Handles API rate limits by pausing when necessary."""
+    if response.status_code == 403 and "X-RateLimit-Remaining" in response.headers:
+        remaining = int(response.headers.get("X-RateLimit-Remaining", 0))
+        if remaining == 0:
+            reset_time = int(response.headers.get("X-RateLimit-Reset", time.time()))
+            sleep_time = reset_time - int(time.time())
+            print(f"Rate limit reached. Sleeping for {sleep_time} seconds...")
+            time.sleep(sleep_time + 1)
+            return True
+    return False
 
 def main():
     try:
@@ -74,6 +92,8 @@ def main():
             json.dump(results, f, indent=4)
         
         print("Results saved to 'all_repositories.json'.")
+        # Sleep to avoid hitting rate limits unnecessarily
+        time.sleep(1)
     except Exception as e:
         print(f"An error occurred: {e}")
 
