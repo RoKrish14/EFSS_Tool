@@ -32,4 +32,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: retrieve_all_repo
-          path: all_repositories.json
+          path: "*.json" 
