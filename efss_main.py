@@ -5,10 +5,10 @@ import time
 
 # set up authentication and configuration for interacting with the GitHub API
 GITHUB_TOKEN = os.getenv('NEW_TOKEN')
-ORGANIZATION_NAME = 'eclipse-tractusx'
+ORGANIZATION_NAMES = ['eclipse-tractusx', 'eclipse-cbi']
 
-url = f"https://api.github.com/orgs/{ORGANIZATION_NAME}/repos"
-response = requests.get(url, headers={"Authorization": f"Bearer {GITHUB_TOKEN}"})
+# url = f"https://api.github.com/orgs/{ORGANIZATION_NAMES}/repos"
+# response = requests.get(url, headers={"Authorization": f"Bearer {GITHUB_TOKEN}"})
 # print(response.status_code, response.json())
 
 # Base URL for GitHub API
@@ -29,8 +29,10 @@ def get_repositories(org_name):
     
     while True:
         response = requests.get(url, headers=headers, params={"per_page": 100, "page": page})
+        if handle_rate_limit(response):
+            continue  # Retry after handling rate limit
         if response.status_code != 200:
-            raise Exception(f"Error fetching repositories: {response.json()}")
+            raise Exception(f"Error fetching repositories {org_name}: {response.json()}")
         
         page_data = response.json()
         if not page_data:  # Exit loop if no more repositories
@@ -43,7 +45,6 @@ def get_repositories(org_name):
 
 # Check if secret scanning is enabled
 def check_secret_scanning(repo_full_name):
-    """Checks if secret scanning is enabled for a specific repository."""
     url = f"{BASE_URL}/repos/{repo_full_name}/secret-scanning/alerts"
     response = requests.get(url, headers=headers)
     
@@ -52,6 +53,8 @@ def check_secret_scanning(repo_full_name):
 
     if response.status_code == 200:
         return True  # Secret scanning is enabled
+    elif response.status_code == 404:
+        return False  # Secret scanning not available for this repo
     elif response.status_code == 403:
         print(f"Access denied for {repo_full_name}. Check permissions.")
         return False  # Permissions issue
@@ -59,43 +62,46 @@ def check_secret_scanning(repo_full_name):
         raise Exception(f"Error checking secret scanning for {repo_full_name}: {response.text}")
 
 def handle_rate_limit(response):
-    """Handles API rate limits by pausing when necessary."""
     if response.status_code == 403 and "X-RateLimit-Remaining" in response.headers:
         remaining = int(response.headers.get("X-RateLimit-Remaining", 0))
         if remaining == 0:
             reset_time = int(response.headers.get("X-RateLimit-Reset", time.time()))
             sleep_time = reset_time - int(time.time())
+            # pause to handle rate limit if needed
             print(f"Rate limit reached. Sleeping for {sleep_time} seconds...")
             time.sleep(sleep_time + 1)
             return True
     return False
 
 def main():
-    try:
-        # Fetch all repositories in the organization
-        repos = get_repositories(ORGANIZATION_NAME)
-        results = {}
-
+  for org_name in ORGANIZATION_NAMES:
+        print(f"Checking repositories for organization: {org_name}")
+        org_results = {}  # Store results for this organization
+        
+        try:
+            repos = get_repositories(org_name)
+        except Exception as e:
+            print(f"Failed to fetch repositories for {org_name}: {e}")
+            continue
+        
         for repo in repos:
             repo_name = repo["full_name"]
             try:
-                # Check secret scanning for the repository
                 secret_scanning_enabled = check_secret_scanning(repo_name)
-                results[repo_name] = secret_scanning_enabled
+                org_results[repo_name] = secret_scanning_enabled
                 status = "enabled" if secret_scanning_enabled else "not enabled"
                 print(f"Secret scanning is {status} for repository {repo_name}.")
             except Exception as e:
                 print(f"Failed to check secret scanning for {repo_name}: {e}")
         
-        # Save results to a JSON file
-        with open("all_repositories.json", "w") as f:
-            json.dump(results, f, indent=4)
-        
-        print("Results saved to 'all_repositories.json'.")
+        # Save results for this organization to a JSON file
+        file_name = f"{org_name}_secret_scanning_results.json"
+        with open(file_name, "w") as f:
+            json.dump(org_results, f, indent=4)
+
+        print(f"Results saved to {file_name}.")
         # Sleep to avoid hitting rate limits unnecessarily
         time.sleep(1)
-    except Exception as e:
-        print(f"An error occurred: {e}")
 
 if __name__ == "__main__":
     main()
