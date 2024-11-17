@@ -61,16 +61,28 @@ def check_secret_scanning(repo_full_name):
     else:
         raise Exception(f"Error checking secret scanning for {repo_full_name}: {response.text}")
 
-def handle_rate_limit(response):
+def handle_rate_limit(response, max_retries=5):
     if response.status_code == 403 and "X-RateLimit-Remaining" in response.headers:
         remaining = int(response.headers.get("X-RateLimit-Remaining", 0))
         if remaining == 0:
             reset_time = int(response.headers.get("X-RateLimit-Reset", time.time()))
             sleep_time = reset_time - int(time.time())
             # pause to handle rate limit if needed
-            print(f"Rate limit reached. Sleeping for {sleep_time} seconds...")
-            time.sleep(sleep_time + 1)
-            return True
+            # print(f"Rate limit reached. Sleeping for {sleep_time} seconds...")
+            # time.sleep(sleep_time + 1)
+            #return True
+            retries = 0
+            while retries < max_retries:
+                # Exponential backoff: 2^n where n is the retry count
+                backoff_time = min(sleep_time + 2 ** retries, 3600)  # cap backoff time at 1 hour
+                print(f"Rate limit reached. Sleeping for {backoff_time} seconds... (Retry {retries + 1}/{max_retries})")
+                time.sleep(backoff_time)
+                response = requests.get(response.url, headers=headers)
+                if response.status_code != 403:  # Exit if rate limit is not exceeded
+                    return False
+                retries += 1
+            # If maximum retries are exceeded, raise an exception
+            raise Exception("Exceeded maximum retries while waiting for rate limit reset.")            
     return False
 
 def main():
